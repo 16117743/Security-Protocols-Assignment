@@ -7,6 +7,7 @@ public class Client extends NetworkConnection {
 
     private String ip;
     private int port;
+    
 
     public Client(String ipadd, int port, Consumer<Serializable> onReceiveCallback) {
         super(onReceiveCallback);
