@@ -70,6 +70,11 @@ public class JavaFXApplication1 extends Application {
     public void start(Stage primaryStage) throws Exception {
         primaryStage.setScene(new Scene(createContent()));
         primaryStage.show();
+        if(!connection.isServer()){
+            Message m1 = new Message("\n*************1 -> client sends public key and challenge\n*************", "bla", 3);
+            System.out.println("\n*************1 -> client sends public key and challenge\n*************");
+            connection.send(m1);
+        }
         //testRSA();
     }
 
@@ -83,7 +88,9 @@ public class JavaFXApplication1 extends Application {
         return new Server(55555, data -> {
             Platform.runLater(() -> {
                 Message m1 = (Message) data;
+                
                 messages.appendText(m1.getFirstName() + "\n");
+                
             });
         });
     }
