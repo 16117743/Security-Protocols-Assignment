@@ -3,10 +3,13 @@
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
         <group>
-            <file>file:/home/tom/Documents/Semester%202/Security%20Protocols/SPv1/src/src/javafxapplication1/Server.java</file>
-            <file>file:/home/tom/Documents/Semester%202/Security%20Protocols/SPv1/src/src/javafxapplication1/NetworkConnection.java</file>
-            <file>file:/home/tom/Documents/Semester%202/Security%20Protocols/SPv1/src/src/javafxapplication1/JavaFXApplication1.java</file>
-            <file>file:/home/tom/Documents/Semester%202/Security%20Protocols/SPv1/src/src/javafxapplication1/Client.java</file>
+            <file>file:/home/tom/Documents/Semester%202/Security%20Protocols/git-sec/Security-Protocols-Assignment/SPv1/src/src/javafxapplication1/Security.java</file>
+            <file>file:/home/tom/Documents/Semester%202/Security%20Protocols/git-sec/Security-Protocols-Assignment/SPv1/src/src/javafxapplication1/Server.java</file>
+            <file>file:/home/tom/Documents/Semester%202/Security%20Protocols/git-sec/Security-Protocols-Assignment/SPv1/src/src/javafxapplication1/EncryptionUtil.java</file>
+            <file>file:/home/tom/Documents/Semester%202/Security%20Protocols/git-sec/Security-Protocols-Assignment/SPv1/src/src/javafxapplication1/JavaFXApplication1.java</file>
+            <file>file:/home/tom/Documents/Semester%202/Security%20Protocols/git-sec/Security-Protocols-Assignment/SPv1/src/src/javafxapplication1/Client.java</file>
+            <file>file:/home/tom/Documents/Semester%202/Security%20Protocols/git-sec/Security-Protocols-Assignment/SPv1/src/src/javafxapplication1/NetworkConnection.java</file>
+            <file>file:/home/tom/Documents/Semester%202/Security%20Protocols/git-sec/Security-Protocols-Assignment/SPv1/src/src/javafxapplication1/Person.java</file>
         </group>
     </open-files>
 </project-private>

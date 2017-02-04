@@ -27,10 +27,8 @@ public abstract class NetworkConnection {
     
     public void send(Serializable data) {
         try{
-            System.out.print(data.toString());
-            Person ted = new Person("Ted", "Neward", 39);
-        System.out.print(ted.toString());
-        connThread.out.writeObject(ted);//
+            System.out.println("sending -> " + data.toString());
+            connThread.out.writeObject(data);//
         }
         catch(IOException io){
             io.printStackTrace();
@@ -67,9 +65,9 @@ public abstract class NetworkConnection {
                 while (true) {
                     //Serializable data = (Serializable) in.readObject();
                     try{
-                        Person p1 = (Person) in.readObject();
-                    System.out.println(p1);
-                    onReceiveCallback.accept(p1);
+                        Message m1 = (Message) in.readObject();
+                        System.out.println("received " + m1.toString());
+                        onReceiveCallback.accept(m1);
                     }
                     catch(IOException io){
                         io.printStackTrace();

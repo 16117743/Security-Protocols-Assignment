@@ -48,8 +48,9 @@ public class JavaFXApplication1 extends Application {
             /******************/
             
             try {
-               // Person ted = new Person("Ted", "Neward", 39);
-                connection.send(message);
+                System.out.println("attempting to send " + message);
+                Message m1 = new Message(message, "bye", 10);
+                connection.send(m1);
             } catch (Exception e) {
                 messages.appendText("Failed to Send mesage\n");
                 e.printStackTrace();
@@ -81,7 +82,8 @@ public class JavaFXApplication1 extends Application {
         System.out.println("creating server");
         return new Server(55555, data -> {
             Platform.runLater(() -> {
-                messages.appendText(data.toString() + "\n");
+                Message m1 = (Message) data;
+                messages.appendText(m1.getFirstName() + "\n");
             });
         });
     }
@@ -90,7 +92,8 @@ public class JavaFXApplication1 extends Application {
         System.out.println("creating client");
         return new Client("127.0.0.1 ", 55555, data -> {
             Platform.runLater(() -> {
-                messages.appendText(data.toString() + "\n");
+                Message m1 = (Message) data;
+                messages.appendText(m1.getFirstName() + "\n");
                 System.out.print("testing\n");
             });
         });
