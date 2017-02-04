@@ -48,7 +48,7 @@ public class JavaFXApplication1 extends Application {
             /******************/
             
             try {
-                System.out.println("attempting to send " + message);
+                System.out.println("\nattempting to send " + message);
                 Message m1 = new Message(message, "bye", 10);
                 connection.send(m1);
             } catch (Exception e) {
@@ -71,7 +71,14 @@ public class JavaFXApplication1 extends Application {
         primaryStage.setScene(new Scene(createContent()));
         primaryStage.show();
         if(!connection.isServer()){
-            Message m1 = new Message("\n*************1 -> client sends public key and challenge\n*************", "bla", 3);
+            final String originalText = "Client challenge and public key";
+            ObjectInputStream inputStream = null;
+
+            // Encrypt the string using the public key
+            inputStream = new ObjectInputStream(new FileInputStream(eu.PUBLIC_KEY_FILE));
+            final PublicKey publicKey = (PublicKey) inputStream.readObject();
+            final byte[] cipherText = eu.encrypt(originalText, publicKey);
+            Message m1 = new Message("\n*************1 -> client sends public key and challenge\n*************", cipherText);
             System.out.println("\n*************1 -> client sends public key and challenge\n*************");
             connection.send(m1);
         }
@@ -100,8 +107,8 @@ public class JavaFXApplication1 extends Application {
         return new Client("127.0.0.1 ", 55555, data -> {
             Platform.runLater(() -> {
                 Message m1 = (Message) data;
-                messages.appendText(m1.getFirstName() + "\n");
-                System.out.print("testing\n");
+                String str = m1.getFirstName();
+                messages.appendText(str + "\n");
             });
         });
     }

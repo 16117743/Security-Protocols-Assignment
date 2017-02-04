@@ -11,15 +11,25 @@ public class Message
     private String textMsg;
     private String lastName;
     private int age;
+    private byte[] payload;
 
-    public Message(String fn, String ln, int a)
+    public Message(String msg, byte[]pl)
     {
-        this.textMsg = fn; this.lastName = ln; this.age = a;
+        this.textMsg = msg; 
+        this.lastName = "lname";
+        this.age = 99;
+        this.payload = pl;
+    }
+    public Message(String msg, String p2, int a){
+        this.textMsg = msg;
+        this.lastName = p2;
+        this.age = a;
     }
     
     public String getFirstName() { return textMsg; }
     public String getLastName() { return lastName; }
     public int getAge() { return age; }
+    public byte[] getPayload(){return payload;}
     
     private void readObject(java.io.ObjectInputStream ois)
         throws java.io.IOException, ClassNotFoundException
@@ -27,6 +37,7 @@ public class Message
         java.io.ObjectInputStream.GetField fields = ois.readFields();
         textMsg = (String)fields.get("textMsg", "(Nobody)");
         lastName = (String)fields.get("lastName", "(Nobody)");
+        payload = (byte[])fields.get("payload", "(Nobody)");
         age = fields.get("age", 0);
     }
     
@@ -37,6 +48,7 @@ public class Message
         fields.put("textMsg", textMsg);
         fields.put("lastName", lastName);
         fields.put("age", age);
+        fields.put("payload", payload);
         oos.writeFields();
     }
     
@@ -46,9 +58,7 @@ public class Message
     
     public String toString()
     {
-        return "[Message: textMsg= " + textMsg + 
-            " lastName=" + lastName +
-            " age=" + age +
+        return "[Message: textMsg= \n" + textMsg + 
             "]";
     }    
     
