@@ -9,8 +9,8 @@ public class Client extends NetworkConnection {
     private int port;
     
 
-    public Client(String ipadd, int port, Consumer<Serializable> onReceiveCallback) {
-        super(onReceiveCallback);
+    public Client(String ipadd, int port, Consumer<Message> onReceiveCallback) {
+        super(onReceiveCallback);//calling the inherited class constructor new NetworkCOnnection(arg)
         this.ip = ipadd;
         this.port = port;
     }

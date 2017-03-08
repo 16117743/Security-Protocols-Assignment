@@ -7,8 +7,8 @@ public class Server extends NetworkConnection {
 
     private int port;
 
-    public Server(int port, Consumer<Serializable> onReceiveCallback) {
-        super(onReceiveCallback);
+    public Server(int port, Consumer<Message> onReceiveCallback) {
+        super(onReceiveCallback); //this is same as "new NetworkConnection(onReceivedCallbacl)". calling the constructor, passing 1 arg
         this.port = port;
     }
 
