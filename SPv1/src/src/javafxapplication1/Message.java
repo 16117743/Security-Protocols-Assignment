@@ -29,7 +29,17 @@ public class Message
         this.ds = pl;
     }
     
-    public Message(String hash, byte[]pl, byte[] ds, int isEncrypted, int isPic)
+    public Message(String filename, String hash, byte[]pl, byte[] ds, int isEncrypted, int isPic) //for pictures
+    {
+        this.plaintext = filename; 
+        this.hash = hash;   
+        this.payload = pl;
+        this.ds = ds;
+        this.isEncrypted = isEncrypted;
+        this.isPic = isPic;
+    }
+    
+    public Message(String hash, byte[]pl, byte[] ds, int isEncrypted, int isPic) //for whatsapp messages
     {
         this.plaintext = hash; 
         this.hash = hash;

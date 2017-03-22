@@ -28,8 +28,8 @@ import javax.crypto.spec.SecretKeySpec;//AES
 
 public class JavaFXApplication1 extends Application {
 
-    private boolean isServer = false;//boolean to determine if the application is running as server or client, (Bob or Alice)
-    //private boolean isServer = true;
+    //private boolean isServer = false;//boolean to determine if the application is running as server or client, (Bob or Alice)
+    private boolean isServer = true;
 
     Button secBtn;// security button
     Button global_ImgBtn; // send pic button
@@ -79,12 +79,14 @@ public class JavaFXApplication1 extends Application {
            
             if(secBtn.getText().equalsIgnoreCase("Security OFF"))//dont encrypt the message if security is set to off
             {
-                connection.send(new Message(message,b1,0,0)); // passing "encrypt = false" and "isPic = false" into the Message constructor. (0 == false) 
+                //connection.send(new Message(message,b1,0,0)); // passing "encrypt = false" and "isPic = false" into the Message constructor. (0 == false) 
                                                               //these flags are read by the receiver to determine how to handle the msg
+                connection.sendString(message,false);
             }
             else // else the security button is ON
             {
-                connection.send(new Message(message,b1,1,0));// passing "encrypt = true" and isPic = false" into the Message constructor
+                //connection.send(new Message(message,b1,1,0));// passing "encrypt = true" and isPic = false" into the Message constructor
+                connection.sendString(message, true);
             }
         });//end inputTextField.setOnAction
         
@@ -201,9 +203,16 @@ public class JavaFXApplication1 extends Application {
             File file1 = fileChooser.showOpenDialog(primaryStage);//Pops up an "Open File" file chooser dialog
             //file1 is initialized with the contents of the file chosen by the user
             
+            boolean encryptFlag = false;
+            
+            if(secBtn.getText().equalsIgnoreCase("Security ON"))//toggle the label from on to off
+                encryptFlag = true;
+            else if(secBtn.getText().equalsIgnoreCase("Security OFF"))//toggle the label from off to on
+                encryptFlag = false;
+            
             try 
             {
-                connection.sendPic(file1.getPath(), true);//send the picture using connection thread
+                connection.sendPic(file1.getPath(), encryptFlag);//send the picture using connection thread
                 if(isServer == true)
                     bobTxt.appendText("File Sent");
                 else

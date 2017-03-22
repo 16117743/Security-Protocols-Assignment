@@ -44,6 +44,7 @@ public abstract class NetworkConnection {
     String ch2;
     private PublicKey clientPubKey;
     private PrivateKey clientPrivKey;
+    private boolean initPhaseOver = false;
     
     public NetworkConnection(Consumer<Message> onReceiveCallback) {//constructor for NetworkConnection
         this.onReceiveCallback = onReceiveCallback;//    
@@ -97,6 +98,26 @@ public abstract class NetworkConnection {
         }
     }
     
+    public void sendString(String text, boolean encryptFlag)
+    {
+        try
+        {
+            String hash = sha256(text.getBytes());
+            byte[] ds = sign(text.getBytes()); // digitally sign the message
+            if(encryptFlag == true)
+            {  
+                byte[] encrypted = aesEncrypt(aesKeyString, "RandomInitVector", text);
+                send(new Message(hash,encrypted,ds,1,0));   
+            }
+            else if(encryptFlag == false)
+            {
+                send(new Message(hash,text.getBytes(),ds,0,0));
+            }
+        }
+        catch(Exception e){     
+        }    
+    }
+    
     public void closeConnection() throws Exception {
         connThread.socket.close();
     }
@@ -118,17 +139,21 @@ public abstract class NetworkConnection {
         String key = "Bar12345Bar12345"; // 128 bit aes key
         String initVector = "RandomInitVector"; // 16 bytes IV, each byte is a char
 
-        if(isEncrypted)
+        if(isEncrypted == true)
         {
-            System.out.println("Encrypting picture using aes key: " + aesKeyString);
-            pic = aesEncryptPic(aesKeyString, "RandomInitVector", pic);   
+            System.out.println("\nEncrypting picture using aes key: " + aesKeyString);
+            Message msg = aesEncryptPic(filename, aesKeyString, "RandomInitVector", pic);
+            send(msg);//passing the bytes containing the picture into the Message constructor
         }
-            
-        //arg 1 = filename, arg2 = picbytes, arg 3 = encrypt False, arg4 = isPic True
-        send(new Message(filename,pic,1,1));//passing the bytes containing the picture into the Message constructor
+        else{
+            System.out.println("\nsending picture NOT using aes ");
+            byte[] ds = sign(pic);
+            String hash = sha256(pic);
+            send(new Message(filename, hash, pic, ds, 0,1));//passing the bytes containing the picture into the Message constructor
+        }
     }
     
-    public byte[] aesEncryptPic(String key, String initVector, byte[] pic)
+    public Message aesEncryptPic(String filename, String key, String initVector, byte[] pic)
     {
         try {
             byte[] initVectorAsBytes = initVector.getBytes("UTF-8");
@@ -138,7 +163,32 @@ public abstract class NetworkConnection {
             Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");//get AES cipher object, Cipher Block Chaining mode, using PKCS5PADDING
             cipher.init(Cipher.ENCRYPT_MODE, skeySpec, iv);//initialize cipher object with secret key and IV
 
-            byte[] encrypted = cipher.doFinal(pic);//encrypt msg byte array using aes
+            byte[] encryptedPic = cipher.doFinal(pic);//encrypt msg byte array using aes
+            
+            String hashStr = sha256(pic);
+            byte[] ds = sign(pic); // digitally sign the message
+           
+            return new Message(filename, hashStr, encryptedPic, ds, 1,1);
+            //return new BASE64Encoder().encode(encrypted);//encode ciphertext using Base64
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+
+        return null;
+    }
+    
+    public byte[] aesEncrypt(String key, String initVector, String msg)
+    {
+        try {
+            byte[] initVectorAsBytes = initVector.getBytes("UTF-8");
+            IvParameterSpec iv = new IvParameterSpec(initVectorAsBytes);//class specifies an initialization vector 
+            SecretKeySpec skeySpec = new SecretKeySpec(key.getBytes("UTF-8"), "AES");//create aes key
+
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");//get AES cipher object, Cipher Block Chaining mode, using PKCS5PADDING
+            cipher.init(Cipher.ENCRYPT_MODE, skeySpec, iv);//initialize cipher object with secret key and IV
+
+            byte[] msgAsBytes = msg.getBytes();//convert msg string to byte array
+            byte[] encrypted = cipher.doFinal(msgAsBytes);//encrypt msg byte array using aes
            
             return encrypted;
             //return new BASE64Encoder().encode(encrypted);//encode ciphertext using Base64
@@ -146,6 +196,70 @@ public abstract class NetworkConnection {
             ex.printStackTrace();
         }
 
+        return null;
+    }
+   
+    public String sha256(byte[] msgAsBytes) {
+    try{
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");//get a SHA-256 message digest object
+
+        //Performs a final update on the digest using the specified array of bytes,
+        //then completes the digest computation.
+        byte[] hash = digest.digest(msgAsBytes);
+        StringBuffer hexString = new StringBuffer();//create string buffer object
+        
+        System.out.println("Hash length in bits =" + hash.length*8);
+
+        for (int i = 0; i < hash.length; i++)//convert each byte in hash byte array to hex string
+        {
+            String hex = Integer.toHexString(0xff & hash[i]);//convert 1 byte to hex string
+            if(hex.length() == 1) 
+                hexString.append('0');
+            
+            hexString.append(hex);//append recently converted hex to hexString buffer
+        }
+
+        return hexString.toString();
+    } catch(Exception ex){
+       throw new RuntimeException(ex);
+    }
+    }
+    
+    public byte[] sign(byte [] data) throws InvalidKeyException, Exception
+    {
+        ObjectInputStream inputStream = new ObjectInputStream(new FileInputStream("keys/private.key"));
+                final PrivateKey privateKey = (PrivateKey) inputStream.readObject();
+		Signature rsa = Signature.getInstance("SHA1withRSA");
+		rsa.initSign(privateKey);
+		rsa.update(data);
+		return rsa.sign();
+    }
+    
+    private Message rsaEncrypt(String msg)
+    {
+        byte[] cipherText;
+        try
+        {
+            PublicKey pubKey;
+            
+            if(isServer())
+                pubKey = clientPubKey;
+            else
+                pubKey = serverPubKey;
+                
+            // get an RSA cipher object 
+            final Cipher cipher = Cipher.getInstance("RSA");
+            // encrypt the plain text using the public key
+            cipher.init(Cipher.ENCRYPT_MODE, pubKey);
+            cipherText = cipher.doFinal(msg.getBytes("UTF-8"));
+    
+            String hashOfChallenge = sha256(msg.getBytes());
+            byte[] ds = sign(msg.getBytes()); // digitally sign the message
+
+            return new Message(hashOfChallenge,cipherText, ds, 1,0); //setting "is encrypt" to true (4th arg)
+        }catch(Exception io){
+            io.printStackTrace();
+        }
         return null;
     }
     
@@ -202,7 +316,7 @@ public abstract class NetworkConnection {
                         System.out.println("\nChallenge 1: "+ randomNum);
 
                         ch1 = Integer.toString(randomNum);//convert random int to string 
-                        Message msg = rsaEncrypt(ch1, serverPubKey);//encrypt using server's public key 
+                        Message msg = rsaEncrypt(ch1);//encrypt using server's public key 
                         send(msg);
                     }
                 }
@@ -226,30 +340,41 @@ public abstract class NetworkConnection {
                 }while(initCon > 0);
                 
                 System.out.print("\n********** secure connection established*********\n");
-                
+                initPhaseOver = true;
 
                 while (true) 
                 {
                     try
                     {
                         Message m1 = (Message) in.readObject(); //read Message object from inputstream
-
-                        if(m1.getIsPic() == 0){
+                        
+                        if(m1.getIsPic() == 0)
+                        {
                             System.out.println("pic set to false");
+                            validateDigSig(m1);
+                            validateHash(m1);
                             if(m1.getIsEncrypted()==0)
                             { //check the "isEncrypted" field of the message object
-                                System.out.println("\nencryption set to false"); 
+                                System.out.println("\nencryption set to false");
+                                String ptStr = new String(m1.getPayload());
+                                onReceiveCallback.accept(new Message(ptStr));//update the GUI on Javafxapplication1
                             }
-                            else{
+                            else
+                            {
                                 System.out.println("\nencryption set to true");
-                            }
-                            onReceiveCallback.accept(m1);//update the GUI on Javafxapplication1
+                                byte[] pt = aesDecrypt(aesKeyString, "RandomInitVector", m1.getPayload());
+                                String ptStr = new String(pt);
+                                Message newMesage = new Message(ptStr);
+                                onReceiveCallback.accept(newMesage);//update the GUI on Javafxapplication1
+                            }         
                         }
                         else if (m1.getIsPic() == 1)
                         {
                             System.out.println("pic set to true");
+                            validateDigSig(m1);
+                            validateHash(m1);
                             
-                            String filenameFull = m1.plaintext();//get filename from hash field, (will be updated later)
+                            String filenameFull = m1.plaintext();//get filename from plaintext field
                             String[] parts = filenameFull.split(Pattern.quote(".")); // Split on period.
                             
                             System.out.println(filenameFull);
@@ -264,7 +389,8 @@ public abstract class NetworkConnection {
                                 System.out.println("\nencryption set to false"); 
                                 fos.write(m1.getPayload()); //get the "byte [] payload" from the msg object. Then write those bytes into the  file
                             }
-                            else{
+                            else
+                            {
                                 System.out.println("\nencryption set to true");
                                 decryptedPic = aesPicDecrypt(aesKeyString,"RandomInitVector", m1.getPayload());
                                 System.out.println("\nPicture successfully decrypted\n");
@@ -296,27 +422,29 @@ public abstract class NetworkConnection {
                 case 2:
                     System.out.println("\n***STEP 2: server responds to challenge\n*************");
                     initCon--;
-                    System.err.println("server initcon =" + initCon);
+                    System.err.println("server initcon = " + initCon);
+                    validateDigSig(data);
+                    validateHash(data);
                     ch1 = rsaDecrypt(data.getPayload(),serverPrivKey);
-                    System.out.println("decrypted challenge = " + ch1); 
+                    System.out.println("decrypted client's challenge = " + ch1); 
                     int randomNum = ThreadLocalRandom.current().nextInt(10000000, 90000000 + 1);
                     System.out.println("\nServer's challenge: "+ randomNum);
                     ch2 = Integer.toString(randomNum);//convert random int to string
                     String response1 = ch1;
-                    //System.out.println("server retreiving client's public key from plaintext field");
-                    //clientPubKey = loadPublicKey(data.plaintext());//setting clientPubKey field
-                    Message msg = rsaEncrypt(ch2 + response1, clientPubKey);//encrypt using clients public key
+                    Message msg = rsaEncrypt(ch2 + response1);//encrypt using clients public key
                     send(msg);
                     break;
                 case 1: 
                     System.out.println("\n***STEP 4: server verifies challenge response\n*************");
                     initCon--;
                     System.err.println("server initcon =" + initCon);
+                    validateDigSig(data);
+                    validateHash(data);
                     String response2 = rsaDecrypt(data.getPayload(),serverPrivKey);
                     System.out.println("Decrypt Client's response to Server's challenge: " + response2);
                     verifyChallenge(ch2,response2);
                     generateAESKey(ch1,ch2);
-                    Message m3 = rsaEncrypt("OK", clientPubKey);//encrypt using client's public key
+                    Message m3 = rsaEncrypt("OK");//encrypt using client's public key
                     send(m3);       
                     break;
                 default:
@@ -335,18 +463,20 @@ public abstract class NetworkConnection {
                     System.out.println("\n***STEP 3:\n3.1 Client receives server's response to challenge\n3.2 Client generates AES key\n3.3 Client responds to server's challenge\n*************\n");
                     initCon--; 
                     System.out.println("client initcon =" + initCon);
+                    validateDigSig(data);
+                    validateHash(data);
                     String challengeResponse = rsaDecrypt(data.getPayload(),clientPrivKey);
                     ch2 = challengeResponse.substring(0, 8);
                     String response = challengeResponse.substring(8);
                     System.out.println("decrypted challenge: " + ch2);
                     verifyChallenge(ch1,response);           
-                    Message m2 = rsaEncrypt(ch2, serverPubKey);
+                    Message m2 = rsaEncrypt(ch2);
                     send(m2);
                     break;
                 case 1:
                     System.out.println("\n***STEP 5: client checks if server accepted response to challenge\n");
                     System.out.println("client initcon =" + initCon);
-                    System.out.println("Sever's response: " + rsaDecrypt(data.getPayload(),clientPrivKey));
+                    System.out.println("Server's response: " + rsaDecrypt(data.getPayload(),clientPrivKey));
                     generateAESKey(ch1,ch2);
                     initCon--;
                     break;
@@ -366,58 +496,14 @@ public abstract class NetworkConnection {
             else
             {
                 System.out.println("Challenge response REJECTED\nterminating connection");
-                closeConnection();
+               // closeConnection();
             }
         }
         catch(Exception e){
             
         }
 
-    }
-        
-        
-    public void f2()
-    {
-        try
-        {
-            generateRSAKeys();
-//            int randomNum = ThreadLocalRandom.current().nextInt(10000000, 90000000 + 1);
-//            System.out.println("\nChallenge 1: "+ randomNum);
-//            String challenge1 = Integer.toString(randomNum);//convert random int to string 
-//         
-//            Message msg = rsaEncrypt(challenge1);
-//         
-//            try
-//            {
-//            ObjectInputStream inputStream = new ObjectInputStream(new FileInputStream("keys/public.key"));//step 1 
-//            final PublicKey publicKey = (PublicKey) inputStream.readObject();
-//            String pubkeyStr = savePublicKey(publicKey);
-//            System.out.println("public key of sender = " + pubkeyStr);
-//            msg.setPlaintext(pubkeyStr); //setting sender public key field, used to verify digital signature
-//
-//            }catch(Exception io){
-//                io.printStackTrace();
-//            }
-//            System.out.println("\nSimulate sending message to Bob \n*******\n\nBob received message!");
-//            //validateHash(msg);
-//            //validateDigSig(msg);
-//            String encryptedChallenge = new String(msg.getPayload(),"UTF-8");
-//            System.out.println("\nEncrypted challenge:\n" + encryptedChallenge);
-//            String decryptedChallenge = rsaDecrypt(msg.getPayload());
-//            System.out.println("\nDecrypted challenge:\n" + decryptedChallenge);
-//            
-//            
-//            System.out.println("\nBob generates session key\n");
-//            String challenge2 = generateResponseChallenge(decryptedChallenge);
-//            System.out.println("\nSimulate sending response to Alice \n*******\n\nAlice received message!");
-//            System.out.println("\nAlice generates session key");
-//            generateAESKey(challenge1,challenge2);
-        }
-        catch(Exception e){
-            e.printStackTrace();
-        }      
-    }
-        
+    }    
         
     /******************Connection Class methods*********************************************************/
         
@@ -430,16 +516,35 @@ public abstract class NetworkConnection {
             else
                 pvtKey = clientPrivKey;
         
-        String challenge = rsaDecrypt(msg.getPayload(), pvtKey);
-        String hashOfReceivedMsg = sha256(challenge);
-        String appendedHash = msg.getHash();
-
+        String ptStr = "";
+        byte[] ptBytes;
+        String hashOfReceivedMsg = "";
+        String appendedHash = "";
+        if(initPhaseOver== true && msg.getIsEncrypted()==1)
+        {
+            ptBytes = aesDecrypt(aesKeyString, "RandomInitVector", msg.getPayload());
+            ptStr = new String(ptBytes);
+            hashOfReceivedMsg = sha256(ptBytes);       
+        }
+        else if(initPhaseOver== true && msg.getIsEncrypted()==0)
+        {
+            ptBytes = msg.getPayload();
+            ptStr = new String(ptBytes);
+            hashOfReceivedMsg = sha256(ptBytes);       
+        }
+        else if(initPhaseOver== false)
+        {
+            ptStr = rsaDecrypt(msg.getPayload(), pvtKey);
+            hashOfReceivedMsg = sha256(ptStr.getBytes());        
+        }
+        appendedHash = msg.getHash();  
         System.out.println("\nHash Of Received Msg: \n" + hashOfReceivedMsg);
         System.out.println("\nAppended hash: \n" + appendedHash);
 
         if(hashOfReceivedMsg.equals(appendedHash)){
             System.out.println("\nAppended hash is the same as the hash of the payload received!\n");
         }
+        
     }
         
     public void validateDigSig(Message msg)
@@ -453,8 +558,21 @@ public abstract class NetworkConnection {
             else
                 pvtKey = clientPrivKey;
             
-            String msgStr = rsaDecrypt(msg.getPayload(),pvtKey);
-            byte[] data = msgStr.getBytes();
+            
+            String msgStr = "";
+            byte[] data = null;
+            if(initPhaseOver== true && msg.getIsEncrypted()==1)
+            {
+                data = aesDecrypt(aesKeyString, "RandomInitVector", msg.getPayload());
+            }
+            else if(initPhaseOver== true && msg.getIsEncrypted()==0)
+            {
+                data = msg.getPayload();
+            }
+            else if (initPhaseOver== false) {
+                msgStr = rsaDecrypt(msg.getPayload(),pvtKey);
+                data = msgStr.getBytes();
+            }
 
             Signature sig = Signature.getInstance("SHA1withRSA");
        
@@ -472,22 +590,19 @@ public abstract class NetworkConnection {
             System.out.println("\nVerifying Digital Signature using Public Key of the sender");
             sig.update(data);
 
-            System.out.println("\nsignature verifcation = " + sig.verify(signatureBytes)+ "!!" );
+            if(sig.verify(signatureBytes)==true)
+                System.out.println("\n signature verifcation = true!!" );
+            else if(sig.verify(signatureBytes)==false)
+            {
+                System.out.println("\n signature verifcation = false!!\n Closing connection" );
+                //closeConnection();
+            }                
         }
         catch(Exception e){
             e.printStackTrace();
         }
     }
-        
-    public byte[] sign(String data) throws InvalidKeyException, Exception
-    {
-        ObjectInputStream inputStream = new ObjectInputStream(new FileInputStream("keys/private.key"));
-                final PrivateKey privateKey = (PrivateKey) inputStream.readObject();
-		Signature rsa = Signature.getInstance("SHA1withRSA");
-		rsa.initSign(privateKey);
-		rsa.update(data.getBytes());
-		return rsa.sign();
-    }
+
     
     public  void generateRSAKeys() 
     {
@@ -559,13 +674,6 @@ public abstract class NetworkConnection {
     {
         try 
         {   
-//            ObjectInputStream inputStream = null;
-//
-//            // Decrypt the cipher text using the private key.
-//            inputStream = new ObjectInputStream(new FileInputStream("keys/private.key"));//for reading from private key file
-//            
-//            final PrivateKey privateKey = (PrivateKey) inputStream.readObject();//create private key by reading from file
-      
           final Cipher cipher = Cipher.getInstance("RSA");// get an RSA cipher object
 
           cipher.init(Cipher.DECRYPT_MODE, privateKey);//initialize cipher object using 
@@ -578,29 +686,7 @@ public abstract class NetworkConnection {
         return null;
    }
 
-    private Message rsaEncrypt(String msg, PublicKey publicKey)
-    {
-        ObjectInputStream inputStream = null;
-        byte[] cipherText;
-        try{
-//            inputStream = new ObjectInputStream(new FileInputStream("keys/public.key"));//step 1 
-//            final PublicKey publicKey = (PublicKey) inputStream.readObject();
-
-            // get an RSA cipher object 
-            final Cipher cipher = Cipher.getInstance("RSA");
-            // encrypt the plain text using the public key
-            cipher.init(Cipher.ENCRYPT_MODE, publicKey);
-            cipherText = cipher.doFinal(msg.getBytes("UTF-8"));
     
-            String hashOfChallenge = sha256(msg);
-            byte[] ds = sign(msg); // digitally sign the message
-
-            return new Message(hashOfChallenge,cipherText, ds, 1,0); //setting "is encrypt" to true (4th arg)
-        }catch(Exception io){
-            io.printStackTrace();
-        }
-        return null;
-    }
     
         
     public void generateAESKey(String ch1,String ch2){
@@ -618,27 +704,6 @@ public abstract class NetworkConnection {
         }
     }
     
-     public byte[] aesEncrypt(String key, String initVector, String msg)
-    {
-        try {
-            byte[] initVectorAsBytes = initVector.getBytes("UTF-8");
-            IvParameterSpec iv = new IvParameterSpec(initVectorAsBytes);//class specifies an initialization vector 
-            SecretKeySpec skeySpec = new SecretKeySpec(key.getBytes("UTF-8"), "AES");//create aes key
-
-            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");//get AES cipher object, Cipher Block Chaining mode, using PKCS5PADDING
-            cipher.init(Cipher.ENCRYPT_MODE, skeySpec, iv);//initialize cipher object with secret key and IV
-
-            byte[] msgAsBytes = msg.getBytes();//convert msg string to byte array
-            byte[] encrypted = cipher.doFinal(msgAsBytes);//encrypt msg byte array using aes
-           
-            return encrypted;
-            //return new BASE64Encoder().encode(encrypted);//encode ciphertext using Base64
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
-
-        return null;
-    }
     
     public byte[] aesDecrypt(String key, String initVector, byte[] encrypted) {
         try {
@@ -648,7 +713,7 @@ public abstract class NetworkConnection {
             Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");//get AES cipher object, Cipher Block Chaining mode, using PKCS5PADDING
             cipher.init(Cipher.DECRYPT_MODE, skeySpec, iv);//initialize cipher object in decrypt mode
 
-            byte[] original = cipher.doFinal(Base64.getDecoder().decode(encrypted));//decrypt msg bytes using aes
+            byte[] original = cipher.doFinal(encrypted);//decrypt msg bytes using aes
 
             return original; //return decryption as a string
         } catch (Exception ex) {
@@ -675,36 +740,7 @@ public abstract class NetworkConnection {
 
         return null;
     }
-    
-    public String sha256(String msg) {
-    try{
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");//get a SHA-256 message digest object
-        
-        byte[] msgAsBytes = msg.getBytes("UTF-8");//put the message into byte array
-        
-        //Performs a final update on the digest using the specified array of bytes,
-        //then completes the digest computation.
-        byte[] hash = digest.digest(msgAsBytes);
-        StringBuffer hexString = new StringBuffer();//create string buffer object
-        
-        //System.out.println("Hash length in bits =" + hash.length*8);
-
-        for (int i = 0; i < hash.length; i++)//convert each byte in hash byte array to hex string
-        {
-            String hex = Integer.toHexString(0xff & hash[i]);//convert 1 byte to hex string
-            if(hex.length() == 1) 
-                hexString.append('0');
-            
-            hexString.append(hex);//append recently converted hex to hexString buffer
-        }
-
-        return hexString.toString();
-    } catch(Exception ex){
-       throw new RuntimeException(ex);
-    }
-    }
-    
-    
+ 
 
     }//ConnectionThread class
 }//end NetworkConnection class
